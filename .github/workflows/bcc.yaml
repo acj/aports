@@ -1,0 +1,41 @@
+name: bcc
+
+on: push
+
+jobs:
+  build-package:
+    name: Build Latest Release
+    runs-on: ubuntu-18.04
+
+    steps:
+    - name: Check out aports
+      uses: actions/checkout@master
+      with:
+        fetch-depth: 1
+    - name: Determine the current package version
+      id: determine-package-version
+      env:
+        PACKAGE_PATH: community/bcc
+      run: |
+        curl -s https://raw.githubusercontent.com/alpinelinux/aports/master/$PACKAGE_PATH/APKBUILD | grep "pkgver=" | sed -E 's/pkgver=//g' > "$GITHUB_WORKSPACE"/steps.determine-package-version.output
+    - name: Determine the newest release version
+      id: determine-release-version
+      env:
+        GITHUB_REPO: iovisor/bcc
+      run: |
+        curl -s https://github.com/$GITHUB_REPO/releases.atom | grep "<title>" | grep -G -o "v[^ <]\+" | head -1 | tr -d 'v' > "$GITHUB_WORKSPACE"/steps.determine-release-version.output
+    - name: Try building the new release version
+      uses: acj/abuilder@master
+      with:
+        PACKAGE_PATH: community/bcc
+        PACKAGE_VERSION_PATH: steps.determine-package-version.output
+        RELEASE_VERSION_PATH: steps.determine-release-version.output
+    - name: Create a branch with updated package version
+      uses: acj/action-branch-from-working-copy@master
+      with:
+        BRANCH_NAME: new-version
+        COMMIT_MESSAGE: "community/bcc: update to X.Y.Z"
+        COMMIT_AUTHOR_NAME: Adam Jensen
+        COMMIT_AUTHOR_EMAIL: acjensen@gmail.com
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
