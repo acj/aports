@@ -1,0 +1,74 @@
+name: bcc
+
+on:
+  push:
+    branches:
+      - master
+      - actions/abuild/*
+  schedule:
+    - cron:  '0 9 * * *'
+
+jobs:
+  build:
+    name: Build Latest Release
+    runs-on: ubuntu-18.04
+
+    steps:
+    - name: Resolve package and release versions
+      id: resolve_versions
+      env:
+        GITHUB_REPO: iovisor/bcc
+        PACKAGE_PATH: community/bcc
+      run: |
+        PACKAGE_VERSION=$(curl -s https://raw.githubusercontent.com/alpinelinux/aports/master/$PACKAGE_PATH/APKBUILD | grep "pkgver=" | sed -E 's/pkgver=//g')
+        RELEASE_VERSION=$(curl -s https://github.com/$GITHUB_REPO/releases.atom | grep "<title>" | grep -G -o "v[^ <]\+" | head -1 | tr -d 'v')
+
+        if [ "$RELEASE_VERSION" == "$PACKAGE_VERSION" ]; then
+          echo ::set-output name=have_new_version::false
+        else
+          echo ::set-output name=have_new_version::true
+          echo ::set-output name=package_path::"$PACKAGE_PATH"
+          echo ::set-output name=package_version::"$PACKAGE_VERSION"
+          echo ::set-output name=release_version::"$RELEASE_VERSION"
+          echo ::set-output name=branch_name::"$PACKAGE_PATH-to-$RELEASE_VERSION"
+          echo ::set-output name=commit_message::"$PACKAGE_PATH: upgrade to $RELEASE_VERSION"
+        fi
+    - name: Check out aports
+      if: steps.resolve_versions.outputs.have_new_version == 'true'
+      uses: actions/checkout@master
+      with:
+        fetch-depth: 1
+    - name: Try building the new release version
+      if: steps.resolve_versions.outputs.have_new_version == 'true'
+      uses: acj/action-abuild@master
+      with:
+        PACKAGE_PATH: ${{ steps.resolve_versions.outputs.package_path }}
+        PACKAGE_VERSION: ${{ steps.resolve_versions.outputs.package_version }}
+        RELEASE_VERSION: ${{ steps.resolve_versions.outputs.release_version }}
+    - name: Create a branch with updated package version
+      id: create_branch
+      if: steps.resolve_versions.outputs.have_new_version == 'true'
+      uses: acj/action-branch-from-working-copy@master
+      with:
+        BRANCH_NAME: ${{ steps.resolve_versions.outputs.branch_name }}
+        COMMIT_MESSAGE: ${{ steps.resolve_versions.outputs.commit_message }}
+        COMMIT_AUTHOR_NAME: 'Adam Jensen'
+        COMMIT_AUTHOR_EMAIL: 'acjensen@gmail.com'
+        FAIL_IF_BRANCH_EXISTS: 'false'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Notify Slack
+      if: steps.resolve_versions.outputs.have_new_version == 'true'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      run: |
+        branch_name="${{ steps.resolve_versions.outputs.branch_name }}"
+        branch_already_exists=${{ steps.create_branch.outputs.branch_name_already_exists == 'true' }}
+
+        if [ "$branch_already_exists" == "true" ]; then
+          curl -s -X POST -H 'Content-type: application/json' --data "{\"text\":\"New version of ${{ github.workflow }} is available, but branch '$branch_name' already exists\"}" $SLACK_WEBHOOK_URL
+        else
+          PR_URL="https://github.com/acj/aports/pull/new/$branch_name"
+          curl -s -X POST -H 'Content-type: application/json' --data "{\"text\":\"New branch for ${{ github.workflow }} created: $PR_URL\"}" $SLACK_WEBHOOK_URL
+        fi
+
