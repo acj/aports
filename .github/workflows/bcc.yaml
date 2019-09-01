@@ -3,7 +3,7 @@ name: bcc
 on: push
 
 jobs:
-  build-package:
+  build:
     name: Build Latest Release
     runs-on: ubuntu-18.04
 
@@ -12,30 +12,49 @@ jobs:
       uses: actions/checkout@master
       with:
         fetch-depth: 1
-    - name: Determine the current package version
-      id: determine-package-version
-      env:
-        PACKAGE_PATH: community/bcc
-      run: |
-        curl -s https://raw.githubusercontent.com/alpinelinux/aports/master/$PACKAGE_PATH/APKBUILD | grep "pkgver=" | sed -E 's/pkgver=//g' > "$GITHUB_WORKSPACE"/steps.determine-package-version.output
-    - name: Determine the newest release version
-      id: determine-release-version
+    - name: Resolve package and release versions
+      id: check-versions
       env:
         GITHUB_REPO: iovisor/bcc
+        PACKAGE_PATH: community/bcc
       run: |
-        curl -s https://github.com/$GITHUB_REPO/releases.atom | grep "<title>" | grep -G -o "v[^ <]\+" | head -1 | tr -d 'v' > "$GITHUB_WORKSPACE"/steps.determine-release-version.output
+        RELEASE_VERSION=$(curl -s https://raw.githubusercontent.com/alpinelinux/aports/master/$PACKAGE_PATH/APKBUILD | grep "pkgver=" | sed -E 's/pkgver=//g')
+        PACKAGE_VERSION=$(curl -s https://github.com/$GITHUB_REPO/releases.atom | grep "<title>" | grep -G -o "v[^ <]\+" | head -1 | tr -d 'v')
+
+        mkdir -p "$GITHUB_WORKSPACE"/.env
+        echo $PACKAGE_PATH > "$GITHUB_WORKSPACE"/.env/INPUT_PACKAGE_PATH
+        echo $PACKAGE_VERSION > "$GITHUB_WORKSPACE"/.env/INPUT_PACKAGE_VERSION
+        echo $RELEASE_VERSION > "$GITHUB_WORKSPACE"/.env/INPUT_RELEASE_VERSION
+
+        if [ "$RELEASE_VERSION" == "$PACKAGE_VERSION" ]; then
+          echo 1 > "$GITHUB_WORKSPACE"/.env/NOTHING_TO_DO
+        fi
     - name: Try building the new release version
       uses: acj/abuilder@master
       with:
-        PACKAGE_PATH: community/bcc
-        PACKAGE_VERSION_PATH: steps.determine-package-version.output
-        RELEASE_VERSION_PATH: steps.determine-release-version.output
+        PACKAGE_PATH: 'overridden by .env'
+        PACKAGE_VERSION: 'overridden by .env'
+        RELEASE_VERSION: 'overridden by .env'
+    - name: Populate environment variables for new branch
+      run: |
+        if [ -f "$GITHUB_WORKSPACE"/.env/NOTHING_TO_DO ]; then
+          exit 0
+        fi
+
+        PACKAGE_PATH=$(cat "$GITHUB_WORKSPACE"/.env/INPUT_PACKAGE_PATH)
+        RELEASE_VERSION=$(cat "$GITHUB_WORKSPACE"/.env/INPUT_RELEASE_VERSION)
+        echo "$PACKAGE_PATH-to-$RELEASE_VERSION" > "$GITHUB_WORKSPACE"/.env/INPUT_BRANCH_NAME
+        echo "$PACKAGE_PATH: update to $RELEASE_VERSION" > "$GITHUB_WORKSPACE"/.env/INPUT_COMMIT_MESSAGE
+        echo "Adam Jensen" > "$GITHUB_WORKSPACE"/.env/INPUT_COMMIT_AUTHOR_NAME
+        echo "acjensen@gmail.com" > "$GITHUB_WORKSPACE"/.env/INPUT_COMMIT_AUTHOR_EMAIL
     - name: Create a branch with updated package version
       uses: acj/action-branch-from-working-copy@master
       with:
-        BRANCH_NAME: new-version
-        COMMIT_MESSAGE: "community/bcc: update to X.Y.Z"
-        COMMIT_AUTHOR_NAME: Adam Jensen
-        COMMIT_AUTHOR_EMAIL: acjensen@gmail.com
+        BRANCH_NAME: "overridden by .env"
+        COMMIT_MESSAGE: "overridden by .env"
+        COMMIT_AUTHOR_NAME: "overridden by .env"
+        COMMIT_AUTHOR_EMAIL: "overridden by .env"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Finalize
+      run: exit 0
