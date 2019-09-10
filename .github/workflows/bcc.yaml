@@ -1,6 +1,8 @@
 name: bcc
 
-on: push
+on:
+  schedule:
+    - cron:  '0 9 * * *'
 
 jobs:
   build:
