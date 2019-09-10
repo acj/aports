@@ -56,5 +56,14 @@ jobs:
         COMMIT_AUTHOR_EMAIL: "overridden by .env"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: Finalize
-      run: exit 0
+    - name: Notify Slack
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      run: |
+        if [ -f "$GITHUB_WORKSPACE"/.env/NOTHING_TO_DO" ]; then
+          exit 0
+        fi
+
+        BRANCH=$(cat "$GITHUB_WORKSPACE"/.env/INPUT_BRANCH_NAME)
+        PR_URL="https://github.com/acj/aports/pull/new/$BRANCH"
+        curl -s -X POST -H 'Content-type: application/json' --data "{\"text\":\"New branch for bcc created: $PR_URL\"}" $SLACK_WEBHOOK_URL
