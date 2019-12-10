@@ -1,6 +1,6 @@
 # Maintainer: Adam Jensen <acjensen@gmail.com>
 pkgname=libbpf
-pkgver=0.0.5
+pkgver=0.1234.0
 pkgrel=0
 pkgdesc="A library for interacting with the Linux kernel's Berkeley Packet Filter (BPF) facility from user space"
 url="https://github.com/libbpf/libbpf"
