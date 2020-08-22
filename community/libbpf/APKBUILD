@@ -1,6 +1,6 @@
 # Maintainer: Adam Jensen <acjensen@gmail.com>
 pkgname=libbpf
-pkgver=0.0.9
+pkgver=0.1.0
 pkgrel=1
 pkgdesc="A library for interacting with the Linux kernel's Berkeley Packet Filter (BPF) facility from user space"
 url="https://github.com/libbpf/libbpf"
@@ -25,5 +25,5 @@ package() {
 	cp -R "$builddir/include/uapi" "$pkgdir/usr/include/uapi"
 }
 
-sha512sums="d54bbdee6f7ea83ffef3fd0abe07f71644bcf83e5cf4a307fb4e03d885503617f1af2d324cc869f0f01a92bcb58836780a4802ac4db83b9f037ea196edc1131a  libbpf-0.0.9.tar.gz
+sha512sums="3a5d823e4751408fd9e3bafe0be0a6a78de7dea0114bbd1166d8b3887938eef4e355ba6221b4bded9fc8a8280edede606c8c8078fd40aebdeaebbbb38f4221fe  libbpf-0.1.0.tar.gz
 1f19209278f7feaee27a8211f11851c3fe601e5a5c548c8b1bcf1aae7e17c0fe2933e07a3b5b38115c940949ca4c30ad669c618bad69fe2b3d8d1a4d91fecc1b  10-consolidate-lib-dirs.patch"
